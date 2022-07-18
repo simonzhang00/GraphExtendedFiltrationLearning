@@ -1,0 +1,9 @@
+#in original code:
+vertex_filtration_comp_cuda.cpp::vert_filt_persistence_batch
+calls:
+    vertex_filtration_comp_cuda.cpp::vert_filt_persistence_single
+    calls:
+        vertex_filtration_comp_cuda.cpp::vert_filt_comp_calculate_persistence_args
+        calc_pers_cuda.cu::calculate_persistence
+        vr_comp_cuda.cu::calculate_persistence_output_to_barcode_tensors
+
