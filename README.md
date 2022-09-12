@@ -1,4 +1,4 @@
-#Graph Extended Filtration Learning
+# Graph Extended Filtration Learning
 
 ## Summary
 It is difficult for a standard message passing GNN with finite receptive field to keep track of arbitrary cycles of varied length for graph classification. We address this problem by using extended persistence with explicit cycle representatives in the readout function. Extended persistence is a quantifiable multiscale method to capture the relative prominence of cycles and connected components. We also improve the computation of extended perisistence by using a link-cut tree data structure to dynamically maintain cycle information and introduce parallelism. 
