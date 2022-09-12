@@ -24,9 +24,9 @@
 #include <monoids/max_index.hpp>
 
 using namespace torch;
-auto EPS= 1e-20;
-namespace VertExtendedFiltCompCuda_link_cut_tree{
 
+namespace VertExtendedFiltCompCuda_link_cut_tree{
+auto EPS= 1e-20;
     class union_find {
     public:
         union_find(int64_t n) {
@@ -255,11 +255,7 @@ namespace VertExtendedFiltCompCuda_link_cut_tree{
                     }
                 }
 
-    //        print_graph(lct, num_nodes);
                 lct.cut(deletion_vertex);
-    //        print_graph(lct, num_nodes);
-
-
                 auto u_rank = uf.uf_depth(u);//depth of union find connected component is in the union find data structure
                 auto v_rank = uf.uf_depth(v);//depth of union find connected component is in the union find data structure
 

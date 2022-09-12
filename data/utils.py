@@ -1,11 +1,10 @@
 import torch_geometric
 import torch
-#import torch.utils as utils
-
 def my_collate(data_list):
 
+    # ret = torch_geometric.data.Batch().from_data_list(list(iter(data_list[:len(data_list)])))
     ret = torch_geometric.data.Batch().from_data_list(data_list)
-    
+
     boundary_info = []
     sample_pos = [0]
     for d in data_list:

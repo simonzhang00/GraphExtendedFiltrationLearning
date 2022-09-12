@@ -3,7 +3,7 @@ import numpy as np
 import torch_geometric
 import torch_geometric.data
 
-from torch_geometric.datasets import TUDataset
+from torch_geometric.datasets import TUDataset, GNNBenchmarkDataset
 from collections import Counter
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from ogb.graphproppred import PygGraphPropPredDataset
@@ -26,6 +26,8 @@ OGB_DATASET_NAMES= ['ogbg-molhiv', 'ogbg-ppa', 'ogbg-molpcba', 'ogbg-code2',
                             'ogbg-moltox21',
                             'ogbg-moltoxcast']
 SYNTHETIC_DATASET_NAMES= ['SimpleRings', 'PinWheels', 'Simple2Cycles']
+BENCHMARK_GNN_DATASET_NAMES= ['MNIST','CIFAR10']
+
 class SimpleDataset(torch.utils.data.Dataset):
     def __init__(self, X, y):
         assert isinstance(X, list)
@@ -107,7 +109,6 @@ def load_powerfull_gnn_dataset_PTC():
                     node_features = [float(i) for i in row[(2 + num_neighbors):]]
                     assert len(node_features) != 0           
 
-            # x = torch.tensor(node_features) if has_node_features else None
             x = torch.tensor(node_labs, dtype=torch.long)
 
             edge_index = torch.tensor(edges, dtype=torch.long)
@@ -154,13 +155,7 @@ def enhance_SYNTHETICDataset(ds):
     num_edges = []
 
     for d in ds:
-        #print("d.y: ", d.y)
-        #print("d.x", d.x)
         targets.append(d.y)
-
-        # d.edge_idx = d.edge_idx.permute(1, 0)
-        # idx = torch.empty(d.edge_idx.size(0)).uniform_(0, 1)
-        # d.edge_idx = d.edge_idx[torch.where(idx >= 0.01)].permute(1, 0)
 
         boundary_info = get_boundary_info(d)
         d.boundary_info = boundary_info
@@ -180,9 +175,7 @@ def enhance_SYNTHETICDataset(ds):
     max_node_deg = max(max_degree_by_graph)
 
     num_node_lab = None
-    #print("X[0]: ",X[0])
-    #print("X[0].x:", X[0].x)
-    if hasattr(X[0], 'x') and X[0].x is not None:
+    if hasattr(X[0], 'x') and X[0].x is not None and False:
         print("USING NODE LABEL")
         all_node_lab = []
         for d in X:
@@ -207,7 +200,8 @@ def enhance_SYNTHETICDataset(ds):
     new_ds.max_node_deg = max_node_deg
     new_ds.avg_num_nodes = np.mean(num_nodes)
     new_ds.avg_num_edges = np.mean(num_edges)
-    new_ds.num_classes = len(set(targets))
+    print(targets)
+    new_ds.num_classes = min(len(set(targets)), len(set([t.item() for t in  targets])))
     new_ds.num_node_lab = num_node_lab
 
     return new_ds
@@ -220,15 +214,10 @@ def enhance_PYGYDataset(ds):
     num_nodes = []
     num_edges = []
 
-    #dl= torch.utils.data.DataLoader(ds, batch_size=1, shuffle= False)
 
     for d in ds:
-        #print(d.y)
         targets.append(d.y.item())
 
-        # d.edge_idx = d.edge_index.permute(1, 0)
-        # idx = torch.empty(d.edge_index.size(0)).uniform_(0, 1)
-        # d.edge_idx = d.edge_index[torch.where(idx >= 0.01)].permute(1, 0)
 
         boundary_info = get_boundary_info(d)
         d.boundary_info = boundary_info
@@ -257,26 +246,6 @@ def enhance_PYGYDataset(ds):
         num_node_lab= (X[0].x.shape[1])
     else:
         num_node_lab= 0
-    # num_node_lab = len(set([scalar for d in X for node_repr in d.node_lab for scalar in node_repr ]))
-    # if hasattr(X[0], 'x') and X[0].x is not None:
-    #
-    #     all_node_lab = []
-    #     for d in X:
-    #         assert d.x.sum() == d.x.size(0)  # really one hot encoded?
-    #         node_lab = d.x.argmax(1).tolist()
-    #         d.node_lab = node_lab
-    #         all_node_lab += node_lab
-    #
-    #     all_node_lab = set(all_node_lab)
-    #     num_node_lab = len(all_node_lab)
-    #     label_map = {k: i for i, k in enumerate(sorted(all_node_lab))}
-    #
-    #     for d in X:
-    #         d.node_lab = [label_map[f] for f in d.node_lab]
-    #         d.node_lab = torch.tensor(d.node_lab, dtype=torch.long)
-    # else:
-    #     for d in X:
-    #         d.node_lab = None
 
     new_ds = SimpleDataset(X, ds.data.y)
 
@@ -298,14 +267,7 @@ def enhance_TUDataset(ds):
     num_edges = []
     
     for d in ds:
-        #print("d.y: ", d.y)
-        #print("d.x: ", d.x)
-        #print("d.edge_attr: ", d.edge_attr)
         targets.append(d.y.item())
-
-        #d.edge_idx = d.edge_index.permute(1, 0)
-        #idx = torch.empty(d.edge_index.size(0)).uniform_(0, 1)
-        #d.edge_idx = d.edge_index[torch.where(idx >= 0.01)].permute(1, 0)
 
         boundary_info = get_boundary_info(d)
         d.boundary_info = boundary_info
@@ -326,12 +288,11 @@ def enhance_TUDataset(ds):
     
     num_node_lab = None
 
-    if hasattr(X[0], 'x') and X[0].x is not None:
+    if hasattr(X[0], 'x') and X[0].x is not None and False:
         if X[0].x.sum() == X[0].x.size(0):
             all_node_lab = []
             for d in X:
                 assert d.x.sum() == d.x.size(0) # really one hot encoded?
-                #if d.x.sum() == d.x.size(0): # really one hot encoded?
                 node_lab = d.x.argmax(1).tolist()
                 d.node_lab = node_lab
                 all_node_lab += node_lab
@@ -360,7 +321,71 @@ def enhance_TUDataset(ds):
     return new_ds
 
 
-def dataset_factory(dataset_name, verbose=True):
+def enhance_BenchmarkDataset(ds):
+    X = []
+    targets = []
+
+    max_degree_by_graph = []
+    num_nodes = []
+    num_edges = []
+
+    for d in ds:
+        dd= torch_geometric.data.Data(x= d.x, edge_index=d.edge_index, edge_attr= d.edge_attr, y= d.y)
+        targets.append(d.y.item())
+
+        boundary_info = get_boundary_info(d)
+        dd.boundary_info = boundary_info
+
+        num_nodes.append(d.num_nodes)
+        num_edges.append(boundary_info.size(0))
+
+        degree = torch.zeros(d.num_nodes, dtype=torch.long)
+
+        for k, v in Counter(dd.boundary_info.flatten().tolist()).items():
+            degree[k] = v
+        max_degree_by_graph.append(degree.max().item())
+
+        dd.node_deg = degree
+        X.append(dd)
+
+    max_node_deg = max(max_degree_by_graph)
+
+    num_node_lab = None
+
+    if hasattr(X[0], 'x') and X[0].x is not None and False:
+        if X[0].x.sum() == X[0].x.size(0):
+            all_node_lab = []
+            for d in X:
+                assert d.x.sum() == d.x.size(0)  # really one hot encoded?
+                node_lab = d.x.argmax(1).tolist()
+                d.node_lab = node_lab
+                all_node_lab += node_lab
+            all_node_lab = set(all_node_lab)
+            num_node_lab = len(all_node_lab)
+            label_map = {k: i for i, k in enumerate(sorted(all_node_lab))}
+
+            for d in X:  # numbers from consecutive indices represent the one hot encodings now
+                d.node_lab = [label_map[f] for f in d.node_lab]
+                d.node_lab = torch.tensor(d.node_lab, dtype=torch.long)
+        else:
+            for d in X:
+                d.node_lab = d
+    else:
+        for d in X:
+            d.node_lab = None
+
+    new_ds = SimpleDataset(X, ds.data.y)
+
+    new_ds.max_node_deg = max_node_deg
+    new_ds.avg_num_nodes = np.mean(num_nodes)
+    new_ds.avg_num_edges = np.mean(num_edges)
+    new_ds.num_classes = len(set(targets))
+    new_ds.num_node_lab = num_node_lab
+
+    return new_ds
+
+
+def dataset_factory(dataset_name, split= "cv", verbose=True):
     if dataset_name in TU_DORTMUND_DATASET_NAMES:
 
         path = 'data/{}/'.format(dataset_name)
@@ -371,6 +396,9 @@ def dataset_factory(dataset_name, verbose=True):
             dataset = load_powerfull_gnn_dataset_PTC()
     elif dataset_name in OGB_DATASET_NAMES:
         dataset= PygGraphPropPredDataset(name = dataset_name)
+    elif dataset_name in BENCHMARK_GNN_DATASET_NAMES:
+        path = 'data/{}/'.format(dataset_name)
+        dataset= GNNBenchmarkDataset(root= path, name= dataset_name, split= split)
     elif dataset_name in SYNTHETIC_DATASET_NAMES:
         if dataset_name=='SimpleRings':
             dataset= Synthetic.SimpleRings(root=".")
@@ -385,6 +413,8 @@ def dataset_factory(dataset_name, verbose=True):
         dataset= enhance_PYGYDataset(dataset)
     elif dataset_name in SYNTHETIC_DATASET_NAMES:
         dataset= enhance_SYNTHETICDataset(dataset)
+    elif dataset_name in BENCHMARK_GNN_DATASET_NAMES:
+        dataset= enhance_BenchmarkDataset(dataset)
     else:
         dataset = enhance_TUDataset(dataset)
 
@@ -402,6 +432,31 @@ def dataset_factory(dataset_name, verbose=True):
     
     return dataset
 
+def OGB_dataset_factory(dataset_name, verbose= True):
+    if dataset_name in OGB_DATASET_NAMES:
+        dataset = PygGraphPropPredDataset(name=dataset_name)
+        split_idx= dataset.get_idx_split()
+        task_type= dataset.task_type
+        eval_metric= dataset.eval_metric
+    else:
+        raise ValueError("dataset_name not in {}".format(
+             OGB_DATASET_NAMES ))
+    ds_name = dataset.name
+    if dataset_name in OGB_DATASET_NAMES:
+        dataset = enhance_PYGYDataset(dataset)
+
+    if verbose:
+        print("# Dataset: ", ds_name)
+        print('# num samples: ', len(dataset))
+        print('# num classes: ', dataset.num_classes)
+        print('#')
+        print('# max node degree: ', dataset.max_node_deg)
+        print('# num node label ', dataset.num_node_lab)
+        print('#')
+        print('# avg number of nodes: ', dataset.avg_num_nodes)
+        print('# avg number of edges: ', dataset.avg_num_edges)
+
+    return dataset, split_idx, task_type, eval_metric
 
 def train_test_val_split(
     dataset,

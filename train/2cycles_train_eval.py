@@ -32,7 +32,7 @@ import numpy as np
 import torch.optim as optim
 
 from torch.optim.lr_scheduler import MultiStepLR
-
+from distutils.util import strtobool
 torch.backends.cudnn.deterministic = True
 # torch.manual_seed(12345)
 # torch.cuda.manual_seed_all(12345)
@@ -246,6 +246,8 @@ if __name__ == "__main__":
     parser.add_argument('--epoch_step', type=int, default=30)
     parser.add_argument('--batch_size', type=int, default=128)#512)
     parser.add_argument('--weight_decay', type=float, default=0.0)
+    parser.add_argument('--bars', dest='bars',
+                        type=lambda x: bool(strtobool(x.lower())), default=True)
     parser.add_argument('--use_super_level_set_filtration', type=bool, default=True)
     parser.add_argument('--use_raw_node_label', type= bool, default= False)
     parser.add_argument('--use_node_degree', type=bool, default=True)
@@ -256,8 +258,8 @@ if __name__ == "__main__":
     parser.add_argument('--conv_number', type=int, default=5)
     parser.add_argument('--conv_dimension', type=int, default=128)
     parser.add_argument('--gin_mlp_type', type=str, default='lin_bn_lrelu_lin')
-    parser.add_argument('--num_struct_elements', type=int, default=128)
-    parser.add_argument('--cls_hidden_dimension', type=int, default=512)
+    parser.add_argument('--num_struct_elements', type=int, default=128)#128
+    parser.add_argument('--cls_hidden_dimension', type=int, default=128)#128)
     parser.add_argument('--drop_out', type=float, default=0.5)
     parser.add_argument('--output_dir', type=str, default= 'results')
     parser.set_defaults(ssl=False)
@@ -267,14 +269,14 @@ if __name__ == "__main__":
     device= args.device
     dataset = dataset_factory(args.dataset_name, verbose=args.verbose)
 
-    if args.readout == "extph":
-        model = PershomLearnedFiltSupCombo(dataset, args.use_super_level_set_filtration, args.use_node_degree,
+    if args.readout == "extph" or args.readout=='extph_cyclereps':
+        model = PershomLearnedFiltSup(dataset, args.use_super_level_set_filtration, args.use_node_degree,
                                            args.set_node_degree_uninformative, args.use_node_label,
                                            args.use_raw_node_label,
                                            args.filt_conv_number, args.filt_conv_dimension, args.gin_mlp_type,
                                            args.num_struct_elements, args.cls_hidden_dimension, args.drop_out,
                                            conv_number=args.conv_number, conv_dimension=args.conv_dimension, aug=None,
-                                           readout=args.readout).to(device)
+                                           readout=args.readout, use_bars= args.bars).to(device)
     else:
         model = ClassicReadoutFilt(dataset, args.use_super_level_set_filtration, args.use_node_degree,
                                    args.set_node_degree_uninformative, args.use_node_label,

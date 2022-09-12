@@ -60,7 +60,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 //    m.def("VertFiltCompCuda__vert_filt_comp_calculate_persistence_args", &VertFiltCompCuda::vert_filt_comp_calculate_persistence_args, "compute args for calculate_persistence from simplicial complex definition(CUDA)");
 //    m.def("VertFiltCompCuda__vert_filt_persistence_single", &VertFiltCompCuda::vert_filt_persistence_single, "");
 //    m.def("VertFiltCompCuda__vert_filt_persistence_batch", &VertFiltCompCuda::vert_filt_persistence_batch, "");
+
+
+    m.def("VertExtendedFiltCompCuda_link_cut_tree_cyclereps__extended_persistence_batch", &VertExtendedFiltCompCuda_link_cut_tree_cyclereps::extended_filt_persistence_batch, "");
     m.def("VertExtendedFiltCompCuda_link_cut_tree__extended_persistence_batch", &VertExtendedFiltCompCuda_link_cut_tree::extended_filt_persistence_batch, "");
+
+
+
 //    m.def("VertExtendedFiltCompCuda_boundary_matrix__vert_filt_extended_persistence_batch", &VertExtendedFiltCompCuda_boundary_matrix::extended_filt_persistence_batch, "");
 
 }

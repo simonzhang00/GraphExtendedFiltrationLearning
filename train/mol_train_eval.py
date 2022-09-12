@@ -1,5 +1,4 @@
 import time
-import sys
 
 import torch
 import torch.nn.functional as F
@@ -23,13 +22,9 @@ import torch
 import os
 
 import argparse
-
-from torch.utils.tensorboard import SummaryWriter
-writer= SummaryWriter()
-
 import numpy as np
-
 import torch.optim as optim
+from distutils.util import strtobool
 
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -39,7 +34,7 @@ torch.backends.cudnn.deterministic = True
 # random.seed(12345)
 # np.random.seed(12345)
 
-from gnn.dd_model import PershomLearnedFilt, PershomLearnedFiltSup, PershomRigidDegreeFilt, GIN, SimpleNNBaseline, ClassicGNN, ClassicReadoutFilt
+from gnn.mol_model import PershomLearnedFilt, PershomLearnedFiltSup, PershomRigidDegreeFilt, GIN, SimpleNNBaseline, ClassicGNN, ClassicReadoutFilt
 from data.data import dataset_factory, train_test_val_split, Subset
 from data.utils import my_collate
 
@@ -70,7 +65,6 @@ def cross_validation_with_val_set(args, dataset, model, folds, epochs, batch_siz
     val_losses, accs, durations = [], [], []
     for fold, (train_idx, test_idx,
                val_idx) in enumerate(zip(*k_fold(dataset, folds, args.device))):
-        # print("train_idx: ", train_idx)
         tr_dataset = Subset(dataset, train_idx)
         te_dataset = Subset(dataset, test_idx)
         val_dataset = Subset(dataset, val_idx)
@@ -116,13 +110,12 @@ def cross_validation_with_val_set(args, dataset, model, folds, epochs, batch_siz
                 'val_loss': val_losses[-1],
                 'test_score': accs[-1],
             }
-            print(eval_info, flush= True)
 
             writer.add_scalars('loss_' + args.exp_name, {'train_loss_fold'+str(fold): float(train_loss)}, epoch)
             writer.add_scalars('score_' + args.exp_name, {'test_score_fold'+str(fold): float(accs[-1])}, epoch)
             if logger is not None:
                 logger(eval_info)
-
+            print(eval_info)
             if epoch % lr_decay_step_size == 0:
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = lr_decay_factor * param_group['lr']
@@ -174,7 +167,6 @@ def k_fold(dataset, folds, device):
         train_mask = torch.ones(len(dataset), dtype=torch.bool)
         train_mask[test_indices[i]] = 0
         train_mask[val_indices[i]] = 0
-        # train_indices.append(train_mask.nonzero(as_tuple=False).view(-1))
         train_indices.append(list(train_mask.nonzero(as_tuple=False).view(-1).cpu().numpy()))
     return (list(train_indices)), (list(test_indices)), (list(val_indices))
 
@@ -234,15 +226,6 @@ def eval_rocauc(model, loader, dataset_name):
                                   'y_true': np.asarray(y_test).reshape(len(y_test), 1)})
     score= 0.0
     if dataset_name == 'ogbg-ppa':
-        # print("ACC computed")
-        # print("DATASET: ", dataset_name)
-        # print(result_dict)
-        # print("ACC as computed by standard metric module: ", acc)
-        # f = open(output_dir + "/_RES_" + exp_name + ".res", "a")
-        # f.write("DATASET: " + dataset_name + ", SSL: " + str(ssl) + ", time: " + str(
-        #     datetime.datetime.now()) + ", experiment: " + exp_name + "\n")
-        # f.writemollip("ACC after grid search : " + str(result_dict['acc']) + "\n")
-        # f.close()
         score= (result_dict['acc'])
     elif dataset_name in ['ogbg-molhiv', 'ogbg-molbace',
                           'ogbg-molbbbp',
@@ -250,34 +233,10 @@ def eval_rocauc(model, loader, dataset_name):
                           'ogbg-molsider',
                           'ogbg-moltox21',
                           'ogbg-moltoxcast']:
-        #print("ROCAUC computed")
-        #print("DATASET: ", dataset_name)
-        #print(result_dict)
-        #f = open(output_dir + "/_RES_" + exp_name + ".res", "a")
-        #f.write("DATASET: " + dataset_name + ", SSL: " + str(ssl) + ", time: " + str(
-        #    datetime.datetime.now()) + ", experiment: " + exp_name + "\n")
-        #f.write("ROAUC after grid search : " + str(result_dict['rocauc']) + "\n")
-        #f.close()
         score= (result_dict['rocauc'])
     elif dataset_name == 'ogbg-code2':
-        # print("F1 computed")
-        # print("DATASET: ", dataset_name)
-        # print(result_dict)
-        # f = open(output_dir + "/_RES_" + exp_name + ".res", "a")
-        # f.write("DATASET: " + dataset_name + ", SSL: " + str(ssl) + ", time: " + str(
-        #     datetime.datetime.now()) + ", experiment: " + exp_name + "\n")
-        # f.write("F1 after grid search : " + str(result_dict['rocauc']) + "\n")
-        # f.close()
         score =(result_dict['f1'])
     elif dataset_name in ['ogbg-molmuv', 'ogbg-molpcba']:
-        # print("AP computed")
-        # print("DATASET: ", dataset_name)
-        # print(result_dict)
-        # f = open(output_dir + "/_RES_" + exp_name + ".res", "a")
-        # f.write("DATASET: " + dataset_name + ", SSL: " + str(ssl) + ", time: " + str(
-        #     datetime.datetime.now()) + ", experiment: " + exp_name + "\n")
-        # f.write("AP after grid search : " + str(result_dict['rocauc']) + "\n")
-        # f.close()
         score= (result_dict['ap'])
     return score
 
@@ -317,6 +276,9 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_name', type= str, default= 'ogbg-molbbbp')
     # parser.add_argument('--selfsupervised', dest='ssl', default= True, type= bool)#action='store_false')
     # parser.add_argument('--evaluation', type=str, default= 'SVC', choices= ['RandomForest', 'LogisticRegression', 'SVC'], help= 'downstream evaluation protocol classifier type')
+
+    parser.add_argument('--bars', dest='bars',
+                        type=lambda x: bool(strtobool(x.lower())), default= True)
     parser.add_argument('--seed', dest= 'seed', default= 0)
     parser.add_argument('--verbose', type= bool, default= True)
     parser.add_argument('--sup_combo', dest= 'sup', default= True, type= bool)
@@ -349,14 +311,14 @@ if __name__ == "__main__":
 
     dataset = dataset_factory(args.dataset_name, verbose=args.verbose)
 
-    if args.readout == "extph":
+    if args.readout == "extph" or args.readout== 'extph_cyclereps':
         model = PershomLearnedFiltSup(dataset, args.use_super_level_set_filtration, args.use_node_degree,
                                            args.set_node_degree_uninformative, args.use_node_label,
                                            args.use_raw_node_label,
                                            args.filt_conv_number, args.filt_conv_dimension, args.gin_mlp_type,
                                            args.num_struct_elements, args.cls_hidden_dimension, args.drop_out,
                                            conv_number=args.conv_number, conv_dimension=args.conv_dimension, aug=None,
-                                           readout=args.readout).to(device)
+                                           readout=args.readout, use_bars= args.bars).to(device)
     else:
         model = ClassicReadoutFilt(dataset, args.use_super_level_set_filtration, args.use_node_degree,
                                    args.set_node_degree_uninformative, args.use_node_label,

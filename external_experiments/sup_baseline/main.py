@@ -28,6 +28,7 @@ args = parser.parse_args()
 layers = [1, 2, 3, 4, 5]
 hiddens = [64, 128]
 datasets = ["PROTEINS", 'IMDB-MULTI', 'DD', 'MUTAG', 'PinWheels', 'SimpleTwoCycles']
+
 nets = [
     GCN,
     GraphSAGE,

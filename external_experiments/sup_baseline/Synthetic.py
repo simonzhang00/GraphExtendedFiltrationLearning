@@ -1,25 +1,29 @@
-import os.path as osp
-
 import torch
 from torch_geometric.data import Dataset, download_url
 from torch_geometric.data import Data, InMemoryDataset
 from random import randrange
+import numpy as np
 
+def fix_seed(seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
 
 class SimpleTwoCycles(InMemoryDataset):
-    def __init__(self, root, num_graphs= 1000, transform=None, pre_transform=None):
+    def __init__(self, root, num_graphs= 20, transform=None, pre_transform=None):
         self.num_graphs= num_graphs
         self.name= "SimpleTwoCycles"
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
-
+        fix_seed(0)
     @property
     def raw_file_names(self):
        return ['twocycles_'+str(i)+'.pt' for i in range(self.num_graphs)]
 
     @property
     def processed_file_names(self):
-        return ['twocycles_data.pt']
+        return ['twocycle_data.pt']
 
     #def download(self):
     #    # Download to `self.raw_dir`.
@@ -27,27 +31,31 @@ class SimpleTwoCycles(InMemoryDataset):
     #    ...
 
     def process(self):
-        data_list= []
+        data_list = []
         idx = 0
         for n in range(int(self.num_graphs)):
-            if n % 2==0:
-                n= randrange(53,63)
-                #for raw_path in self.raw_paths:
+            if n % 2 == 0:
+                n = randrange(53, 63)
+                # for raw_path in self.raw_paths:
                 # Read data from `raw_path`.
-                data = Data(x= torch.tensor([[1,0]]*n).float(),
-                    edge_index=torch.tensor([[0,1],[1,2],[2,0]]+[[i,i+1] for i in range(3,n-1)]+[[n-1,3]]).transpose(0,1),y= torch.tensor([1]).float())
+                data = Data(x=torch.tensor([[1., 0.]] * n, dtype= torch.float),
+                            edge_index=torch.tensor([[0, 1], [1, 2], [2, 0]] + [[i, i + 1] for i in range(3, n - 1)] + [
+                                [n - 1, 3]]).transpose(0, 1), y=torch.tensor([1]))
 
-                data.y= torch.Tensor([1]).float()
+                data.y = torch.Tensor([1])
                 print("data0; ", data)
                 print("data0.y", data.y)
                 print("data0.x: ", data.x)
             else:
                 n = randrange(53, 63)
-                k= int(n/2)
-                data = Data(x= torch.tensor([[1,0]]*n).float(),
-                            edge_index=torch.tensor([[i,i+1] for i in range(0,k-1)]+ [[k-1,0]]+ [[i,i+1] for i in range(k,n-1)]+ [[n-1,k]]).transpose(0, 1),
-                            y=torch.tensor([0]).float())
-                data.y = torch.Tensor([0]).float()
+                k = int(n / 2)
+                data = Data(x=torch.tensor([[1., 0.]] * n, dtype= torch.float),
+                            edge_index=torch.tensor(
+                                [[i, i + 1] for i in range(0, k - 1)] + [[k - 1, 0]] + [[i, i + 1] for i in
+                                                                                        range(k, n - 1)] + [
+                                    [n - 1, k]]).transpose(0, 1),
+                            y=torch.tensor([0]))
+                data.y = torch.Tensor([0])
 
                 print(data)
             data.num_nodes = n
@@ -57,30 +65,29 @@ class SimpleTwoCycles(InMemoryDataset):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
-            #torch.save(data, osp.join(self.processed_dir, f'data_{idx}.pt'))
             idx += 1
             data_list.append(data)
         print(data_list)
-        data,slices= self.collate(data_list)
-        torch.save((data,slices), self.processed_paths[0])
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_paths[0])
 
     def len(self):
         return self.num_graphs
 
-class SimpleRegular(InMemoryDataset):
-    def __init__(self, root, num_graphs= 1000, transform=None, pre_transform=None):
+class PinWheels(InMemoryDataset):
+    def __init__(self, root, num_graphs= 100, transform=None, pre_transform=None):
         self.num_graphs= num_graphs
-        self.name= "SimpleRegular"
+        self.name= "PinWheels"
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
-
+        fix_seed(0)
     @property
     def raw_file_names(self):
-       return ['regular_'+str(i)+'.pt' for i in range(self.num_graphs)]
+       return ['pinwheels_'+str(i)+'.pt' for i in range(self.num_graphs)]
 
     @property
     def processed_file_names(self):
-        return ['regular_data.pt']
+        return ['pinwheels_data.pt']
 
     #def download(self):
     #    # Download to `self.raw_dir`.
@@ -96,27 +103,24 @@ class SimpleRegular(InMemoryDataset):
                 n= tendrils_per_node*6+6
                 #for raw_path in self.raw_paths:
                 # Read data from `raw_path`.
-                data = Data(x= torch.tensor([[1,0]]*n).float(),
+                data = Data(x= torch.tensor([[1,0]]*n, dtype= torch.float),
                     #x= torch.tensor([[1,0,0,0]]*3+[[0,1,0,0]]*3+[[0,0,1,0] if k in [0,1,2] else [0,0,0,1] for k in range(0,6) for i in range(1,tendrils_per_node+1) ]),
-                            edge_index=torch.tensor([[0,1],[1,2],[2,0],[3,4],[4,5],[5,3]]+[[k,6*i+k] for i in range(1,tendrils_per_node+1) for k in range(0,6)]).transpose(0,1),y= torch.tensor([1]).float())
+                            edge_index=torch.tensor([[0,1],[1,2],[2,0],[3,4],[4,5],[5,3]]+[[k,6*i+k] for i in range(1,tendrils_per_node+1) for k in range(0,6)]).transpose(0,1),y= torch.tensor([1]))
 
-                data.y= torch.Tensor([1]).float()
-                print("data0; ", data)
-                print("data0.y", data.y)
-                print("data0.x: ", data.x)
+                data.y= torch.Tensor([1])
             else:
                 tendrils_per_node = randrange(10,13)
                 n = tendrils_per_node * 6 + 6
-                data = Data(x= torch.tensor([[1,0]]*n).float(),
+                data = Data(x= torch.tensor([[1,0]]*n),
                             #x= torch.tensor([[1,0,0,0]]*3+[[0,1,0,0]]*3+[[0,0,1,0] if k in [0,1,2] else [0,0,0,1] for k in range(0,6) for i in range(1,tendrils_per_node+1) ]),
                             edge_index=torch.tensor(
                     [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0]] + [[k, 6 * i + k] for i in
                                                                         range(1, tendrils_per_node + 1) for k in
                                                                         range(0, 6)]).transpose(0, 1),
-                            y=torch.tensor([0]).float())
-                data.y = torch.Tensor([0]).float()
+                            y=torch.tensor([0]))
+                data.y = torch.Tensor([0])
 
-                print(data)
+
             data.num_nodes = n
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
@@ -124,10 +128,9 @@ class SimpleRegular(InMemoryDataset):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
-            #torch.save(data, osp.join(self.processed_dir, f'data_{idx}.pt'))
             idx += 1
             data_list.append(data)
-        print(data_list)
+
         data,slices= self.collate(data_list)
         torch.save((data,slices), self.processed_paths[0])
 
@@ -142,11 +145,11 @@ class SimpleRings(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-       return ['rings_'+str(i)+'.pt' for i in range(self.num_graphs)]
+       return ['ring_'+str(i)+'.pt' for i in range(self.num_graphs)]
 
     @property
     def processed_file_names(self):
-        return ['rings_data.pt']
+        return ['ring_data.pt']
 
     #def download(self):
     #    # Download to `self.raw_dir`.
@@ -181,7 +184,6 @@ class SimpleRings(InMemoryDataset):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
-            #torch.save(data, osp.join(self.processed_dir, f'data_{idx}.pt'))
             idx += 1
             data_list.append(data)
         print(data_list)
@@ -190,8 +192,3 @@ class SimpleRings(InMemoryDataset):
 
     def len(self):
         return self.num_graphs
-
-    # def get(self, idx):
-    #     data = torch.load(osp.join(self.processed_dir, f'data_{idx}.pt'))
-    #
-    #     return data

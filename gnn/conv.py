@@ -195,13 +195,12 @@ class GNN_node_Virtualnode(torch.nn.Module):
 
     def forward(self, batched_data):
 
-        #x, edge_index, edge_attr, batch = batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch
         x, edge_index, edge_attr, batch, node_deg_emb= batched_data.x, batched_data.edge_index, batched_data.edge_attr, batched_data.batch, batched_data.node_deg
         ### virtual node embeddings for graphs
         virtualnode_embedding = self.virtualnode_embedding(torch.zeros(batch[-1].item() + 1).to(edge_index.dtype).to(edge_index.device))
 
 
-        if node_deg_emb is not None:
+        if node_deg_emb is not None and False:
             h_list= [torch.cat([self.atom_encoder(x), node_deg_emb], dim= 1)]
         else:
             h_list = [self.atom_encoder(x)]

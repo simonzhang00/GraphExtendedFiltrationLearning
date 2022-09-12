@@ -5,14 +5,14 @@ import torch.nn as nn
 import functools
 
 from torchPHext.torchex_PHext.nn import SLayerRationalHat, SLayerSquare, SLayerExponential
-from torch_geometric.nn import SAGEConv, LEConv, GINConv, global_add_pool, global_sort_pool, global_max_pool, global_mean_pool
+from torch_geometric.nn import SAGEConv, LEConv, GINConv, global_add_pool, global_sort_pool, global_max_pool, global_mean_pool, Set2Set
 from torchPHext.torchex_PHext import pershom as pershom_ext
 from torch_geometric.nn import GINConv, global_add_pool
 import sys
 sys.path.append(".")
 
-ph_extended_link_tree = pershom_ext.pershom_backend.__C.VertExtendedFiltCompCuda_link_cut_tree__extended_persistence_batch
-
+# ph_extended_link_tree = pershom_ext.pershom_backend.__C.VertExtendedFiltCompCuda_link_cut_tree__extended_persistence_batch
+ph_extended_link_tree_cyclereps= pershom_ext.pershom_backend.__C.VertExtendedFiltCompCuda_link_cut_tree_cyclereps__extended_persistence_batch
 def gin_mlp_factory(gin_mlp_type: str, dim_in: int, dim_out: int):
     if gin_mlp_type == 'lin':
         return nn.Linear(dim_in, dim_out)
@@ -148,7 +148,6 @@ class ClassicGNN(torch.nn.Module):
         edge_index = batch.edge_index
         if self.use_raw_node_label:
             if self.embed_deg is not None:
-                # tmp = [self.embed_deg(node_deg),self.node_label_embedder(node_lab.to(torch.float))]
                 tmp = [self.embed_deg(node_deg),batch.x]
             else:
                 tmp= []
@@ -279,12 +278,11 @@ class StandardPershomReadout(nn.Module):
 
         super().__init__()
         assert isinstance(num_struct_elements, int)
-        #self.use_as_feature_extractor = True#False
 
         self.ldgm_0     = SLayerRationalHat(num_struct_elements, 2, radius_init=0.1)
         self.ldgm_0_ess = SLayerRationalHat(num_struct_elements, 1, radius_init=0.1)
         self.ldgm_1_ess = SLayerRationalHat(num_struct_elements, 1, radius_init=0.1)
-        fc_in_feat = num_struct_elements#3*num_struct_elements
+        fc_in_feat = num_struct_elements
 
         self.cls_head = ClassifierHead(
             dataset,
@@ -312,16 +310,15 @@ class PershomReadout(nn.Module):
 
         super().__init__()
         assert isinstance(num_struct_elements, int)
-        #self.use_as_feature_extractor = True#False
 
         self.ldgm_0_up     = SLayerRationalHat(num_struct_elements, 2, radius_init=0.1)
         self.ldgm_0_down = SLayerRationalHat(num_struct_elements, 2, radius_init=0.1)
-        self.ldgm_cc= SLayerRationalHat(num_struct_elements, 2, radius_init=0.1) #SLayerExponential(num_struct_elements, 2)#SLayerSquare(num_struct_elements, 2)
-        self.ldgm_h1 =  SLayerRationalHat(num_struct_elements, 2, radius_init=0.1)# SLayerExponential(num_struct_elements, 2)#SLayerSquare(num_struct_elements, 2)
+        self.ldgm_cc= SLayerRationalHat(num_struct_elements, 2, radius_init=0.1)
+        self.ldgm_h1 =  SLayerRationalHat(num_struct_elements, 2, radius_init=0.1)
 
         self.ldgm_0_ess = SLayerRationalHat(num_struct_elements, 1, radius_init=0.1)
         self.ldgm_1_ess = SLayerRationalHat(num_struct_elements, 1, radius_init=0.1)
-        fc_in_feat = num_struct_elements#3*num_struct_elements
+        fc_in_feat = num_struct_elements
 
         self.cls_head = ClassifierHead(
             dataset,
@@ -350,7 +347,6 @@ class PershomClassifier(nn.Module):
         ):
 
         super().__init__()
-        #assert isinstance(num_struct_elements, int)
         self.use_as_feature_extractor = False
 
         self.cls_head = ClassifierHead(
@@ -388,11 +384,15 @@ class PershomBase(nn.Module):
         self.epochs= 1
         self.p= 0.01
         self.gnn_node = None
+        self.set2set = Set2Set(1, processing_steps=4)
+        self.k= 5
+        self.lstm= None
+        self.cycle_mlp= None
 
     def compute_extended_ph_link_tree(self,node_filt, batch, device):
         ph_input= []
         for idx, (i, j, e) in enumerate(zip(batch.sample_pos[:-1], batch.sample_pos[1:], batch.boundary_info)):
-            v = node_filt[i:j]#extract vertex values\
+            v = node_filt[i:j]#extract vertex values
             v.to("cpu")
             e.to("cpu")
             #use this for visualization
@@ -402,7 +402,9 @@ class PershomBase(nn.Module):
                 #print("x: ", batch.x)
                 pass
             ph_input.append((v, [e]))
-        pers = ph_extended_link_tree(ph_input)  # ph_input needs to be: (v,[e])
+        # ph_input needs to be: (v,[e])
+        out= ph_extended_link_tree_cyclereps(ph_input)
+        pers= [per[0] for per in out]
 
         h_0_up= [torch.stack([x.to(device) for x in g[0]]) for g in pers]
         h_0_down= [torch.stack([x.to(device) for x in g[1]]) for g in pers]
@@ -411,6 +413,32 @@ class PershomBase(nn.Module):
 
         return h_0_up, h_0_down, h_0_extplus, h_1_extminus
 
+    def compute_extended_ph_link_tree_wcyclereps(self,node_filt, batch, device):
+        ph_input= []
+        for idx, (i, j, e) in enumerate(zip(batch.sample_pos[:-1], batch.sample_pos[1:], batch.boundary_info)):
+            v = node_filt[i:j]#extract vertex values
+            v.to("cpu")
+            e.to("cpu")
+            #use this for visualization
+            if idx==0 and len(batch.boundary_info)==1:
+                #print("v: ",v)
+                #print("edge_index: ", batch.edge_index)
+                #print("x: ", batch.x)
+                pass
+            ph_input.append((v, [e]))
+        # ph_input needs to be: (v,[e])
+        out= ph_extended_link_tree_cyclereps(ph_input)
+        pers= [per[0] for per in out]
+        cycle_reps = [cycles[1] for cycles in out]
+
+        h_0_up= [torch.stack([x.to(device) for x in g[0]]) for g in pers]
+        h_0_down= [torch.stack([x.to(device) for x in g[1]]) for g in pers]
+        h_0_extplus= [torch.stack([x.to(device) for x in g[2]]) for g in pers]
+        h_1_extminus= [torch.stack([x.to(device) for x in g[3]]) for g in pers]
+        cycle_reps= [[torch.stack([x.to(device).unsqueeze(0) for x in c]) for c in cycle] for cycle in cycle_reps]
+
+        return h_0_up, h_0_down, h_0_extplus, h_1_extminus, cycle_reps
+
     def forward(self, batch, device):
 
         assert self.use_super_level_set_filtration is not None
@@ -418,12 +446,34 @@ class PershomBase(nn.Module):
             idx = torch.empty((batch.x.size(1),), dtype=torch.float32).uniform_(0, 1) < self.p
             batch.x[:, idx] = 0
         node_filt0 = self.fil(batch)
-
-        ##h= self.gnn(batch, device)
-
         if self.readout_type == "extph":
             h_0_up_1, h_0_down_1, h_0_cc_1, h_1_1 = self.compute_extended_ph_link_tree(node_filt0, batch, device)
             g1 = self.readout(h_0_up_1, h_0_down_1, h_0_cc_1, h_1_1)
+        elif self.readout_type == "extph_cyclereps":
+            h_0_up_1, h_0_down_1, h_0_cc_1, h_1_1, cycle_reps = self.compute_extended_ph_link_tree_wcyclereps(node_filt0, batch, device)
+            if self.use_bars:
+                g1 = self.readout(h_0_up_1,
+                              h_0_down_1, h_0_cc_1, h_1_1)
+
+            cycle_batch_reps= []
+            for g in range(len(cycle_reps)):
+                cyclegraph_reps= []
+                for c in range(len(cycle_reps[g])):
+                    output, (hn,cn)= self.lstm(cycle_reps[g][c].unsqueeze(0))
+
+                    cyclegraph_reps.append(torch.sum(torch.stack([output[0][i] for i in range(output.size(1))], dim=0), dim=0).unsqueeze(0))
+
+                graph_rep_var, graph_rep_mean= torch.var_mean(torch.cat(cyclegraph_reps, dim=0), dim=0)
+
+                cyclegraph_reps= graph_rep_var
+
+                cycle_batch_reps.append(cyclegraph_reps.unsqueeze(0))
+            cycle_batch_reps= torch.cat(cycle_batch_reps, dim=0)
+
+            if self.use_bars:
+                g1= g1+cycle_batch_reps
+            else:
+                g1= cycle_batch_reps
         elif self.readout_type == "sum":
             node_filt0 = node_filt0.unsqueeze(1)
             g1 = global_add_pool(node_filt0, batch.batch)
@@ -435,11 +485,14 @@ class PershomBase(nn.Module):
             g1 = global_mean_pool(node_filt0, batch.batch)
         elif self.readout_type == "sort":
             node_filt0 = node_filt0.unsqueeze(1)
-            g1 = global_sort_pool(node_filt0, batch.batch, 100)
-
+            g1 = global_sort_pool(node_filt0, batch.batch, 20)
+        elif self.readout_type == "set2set":
+            node_filt0 = node_filt0.unsqueeze(1)
+            g1= self.set2set(node_filt0, batch.batch)
         out= g1
         out = self.classifier_gnn(out)
         out= torch.nn.LogSoftmax(dim=1)(out)
+        # print("pred: ", torch.argmax(out,dim=1), "y: ", batch.y)
         return out
 
     @property
@@ -487,7 +540,6 @@ class ClassicReadoutFilt(PershomBase):
         super().__init__(augmentor)
         self.readout_type = readout
 
-        self.gnn_node = GNN_node_Virtualnode(5, 300)
         self.use_super_level_set_filtration = use_super_level_set_filtration
 
         self.fil = Filtration(
@@ -509,7 +561,7 @@ class ClassicReadoutFilt(PershomBase):
         )
 
         self.cls = PershomClassifier(dataset,
-                                     fc_in_feat=num_struct_elements,  # 3*num_struct_elements,
+                                     fc_in_feat=num_struct_elements,
                                      cls_hidden_dimension=cls_hidden_dimension,
                                      drop_out=drop_out
                                      )
@@ -518,14 +570,17 @@ class ClassicReadoutFilt(PershomBase):
                               set_node_degree_uninformative=set_node_degree_uninformative,
                               use_node_label=use_node_label,
                               use_raw_node_label=use_raw_node_label,
-                              gin_number=conv_number,  # TODO: make this an argument
-                              conv_type='GIN',  # TODO: make this an argument
+                              gin_number=conv_number,
+                              conv_type='GIN',
                               gin_dimension=conv_dimension,
                               gin_mlp_type=gin_mlp_type,
                               )
         self.supervised = True
+        self.k = int(np.percentile([d.num_nodes for d in dataset], 10))
         if self.readout_type == "sort":
-            self.classifier_gnn = ClassifierHead(dataset, 100, cls_hidden_dimension, drop_out=drop_out)
+            self.classifier_gnn = ClassifierHead(dataset, self.k, cls_hidden_dimension, drop_out=drop_out)
+        elif self.readout_type == "set2set":
+            self.classifier_gnn = ClassifierHead(dataset, 2, cls_hidden_dimension, drop_out=drop_out)
         else:
             self.classifier_gnn = ClassifierHead(dataset, 1, cls_hidden_dimension, drop_out=drop_out)
         self.init_weights()
@@ -576,7 +631,7 @@ class PershomLearnedFilt(PershomBase):
         )
         self.readout.use_as_feature_extractor= True
         self.cls= PershomClassifier(dataset,
-            fc_in_feat= num_struct_elements,#3*num_struct_elements,
+            fc_in_feat= num_struct_elements,
             cls_hidden_dimension=cls_hidden_dimension,
             drop_out=drop_out
         )
@@ -610,11 +665,13 @@ class PershomLearnedFiltSup(PershomBase):
                 conv_number: int= None,
                 conv_dimension: int= None,
                 augmentor= (None,None),
+                readout: str=None,
+                use_bars: bool= True,
                 **kwargs,
                 ):
         super().__init__(augmentor)
 
-        self.gnn_node= GNN_node_Virtualnode(5, 300)
+
         self.use_super_level_set_filtration = use_super_level_set_filtration
 
         self.fil = Filtration(
@@ -643,7 +700,7 @@ class PershomLearnedFiltSup(PershomBase):
         )
         self.readout.use_as_feature_extractor= True
         self.cls= PershomClassifier(dataset,
-            fc_in_feat= num_struct_elements,#3*num_struct_elements,
+            fc_in_feat= num_struct_elements,
             cls_hidden_dimension=cls_hidden_dimension,
             drop_out=drop_out
         )
@@ -652,12 +709,13 @@ class PershomLearnedFiltSup(PershomBase):
             set_node_degree_uninformative=set_node_degree_uninformative,
             use_node_label=use_node_label,
             use_raw_node_label= use_raw_node_label,
-            gin_number= conv_number, #TODO: make this an argument
-            conv_type= 'GIN', #TODO: make this an argument
+            gin_number= conv_number,
+            conv_type= 'GIN',
             gin_dimension=conv_dimension,
             gin_mlp_type =gin_mlp_type,
         )
-        #self.mlp= nn.Linear(num_struct_elements*4,gin_dimension)
+        self.readout_type= readout
+
         self.classifier_gnn= ClassifierHead(dataset, 4*num_struct_elements, cls_hidden_dimension, drop_out= drop_out)
         self.classifier_extpers= ClassifierHead(dataset, 4*num_struct_elements, int(cls_hidden_dimension), drop_out= drop_out)
         self.classifier_standardpers = ClassifierHead(dataset, 3 * num_struct_elements, int(cls_hidden_dimension),
@@ -666,6 +724,9 @@ class PershomLearnedFiltSup(PershomBase):
         self.supervised= True
         self.repr2structelems = nn.Linear(conv_dimension,4*num_struct_elements)
         self.structelems2repr = nn.Linear( 4 * num_struct_elements,conv_dimension)
+        self.lstm= torch.nn.LSTM(1,2*num_struct_elements, num_layers = 15, bidirectional = True)
+        self.cycle_mlp= torch.nn.Linear(1, 4*num_struct_elements)
+        self.use_bars= use_bars
         self.init_weights()
 
     def reset_parameters(self):
@@ -783,11 +844,6 @@ class GIN(nn.Module):
             self.k = int(np.percentile([d.num_nodes for d in dataset], 10))
             self.global_pool_fn = functools.partial(global_sort_pool, k=self.k)
             self.sort_pool_nn = nn.Linear(self.k * gin_dimension, gin_dimension)
-            #nn.Conv1d(
-            #    in_channels=gin_dimension,
-            #    out_channels=gin_dimension,
-            #    kernel_size=self.k
-            #)
         else:
             raise ValueError
 

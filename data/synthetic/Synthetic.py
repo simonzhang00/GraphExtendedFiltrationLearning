@@ -10,8 +10,8 @@ def fix_seed(seed):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
 
-class SimpleTwoCycles(InMemoryDataset):#100
-    def __init__(self, root, num_graphs= 400, transform=None, pre_transform=None):#1000
+class SimpleTwoCycles(InMemoryDataset):
+    def __init__(self, root, num_graphs= 20, transform=None, pre_transform=None):
         self.num_graphs= num_graphs
         self.name= "SimpleTwoCycles"
         super().__init__(root, transform, pre_transform)
@@ -33,24 +33,27 @@ class SimpleTwoCycles(InMemoryDataset):#100
     def process(self):
         data_list= []
         idx = 0
-        for n_ in range(int(self.num_graphs)):
-            if n_ % 2==0:
-                n= randrange(500,506)#randrange(100,106)
+        for n in range(int(self.num_graphs)):
+            if n % 2==0:
+                n= randrange(53,63)
                 #for raw_path in self.raw_paths:
                 # Read data from `raw_path`.
-                data = Data(x= torch.tensor([[1,0]]*n),
-                    edge_index=torch.tensor([[i,i+1] for i in range(0,103)]+[[103,0]]+[[i,i+1] for i in range(104,n-1)]+[[n-1,104]]).transpose(0,1),y= torch.tensor([1]))
+                data = Data(x= torch.tensor([[1.,0.]]*n, dtype= torch.float),
+                    edge_index=torch.tensor([[0,1],[1,2],[2,0]]+[[i,i+1] for i in range(3,n-1)]+[[n-1,3]]).transpose(0,1),y= torch.tensor([1]))
 
                 data.y= torch.Tensor([1])
+                print("data0; ", data)
+                print("data0.y", data.y)
+                print("data0.x: ", data.x)
             else:
-                n = randrange(600,601)#randrange(10, 11)
+                n = randrange(53, 63)
                 k= int(n/2)
-                data = Data(x= torch.tensor([[1,0]]*n, dtype= torch.float),
+                data = Data(x= torch.tensor([[1.,0.]]*n, dtype= torch.float),
                             edge_index=torch.tensor([[i,i+1] for i in range(0,k-1)]+ [[k-1,0]]+ [[i,i+1] for i in range(k,n-1)]+ [[n-1,k]]).transpose(0, 1),
                             y=torch.tensor([0]))
                 data.y = torch.Tensor([0])
 
-                # print(data)
+                print(data)
             data.num_nodes = n
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
@@ -60,7 +63,7 @@ class SimpleTwoCycles(InMemoryDataset):#100
 
             idx += 1
             data_list.append(data)
-        #print(data_list)
+        print(data_list)
         data,slices= self.collate(data_list)
         torch.save((data,slices), self.processed_paths[0])
 
@@ -113,7 +116,7 @@ class PinWheels(InMemoryDataset):
                             y=torch.tensor([0]))
                 data.y = torch.Tensor([0])
 
-                # print(data)
+
             data.num_nodes = n
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
@@ -123,7 +126,7 @@ class PinWheels(InMemoryDataset):
 
             idx += 1
             data_list.append(data)
-        # print(data_list)
+
         data,slices= self.collate(data_list)
         torch.save((data,slices), self.processed_paths[0])
 
@@ -177,7 +180,6 @@ class SimpleRings(InMemoryDataset):
             if self.pre_transform is not None:
                 data = self.pre_transform(data)
 
-            #torch.save(data, osp.join(self.processed_dir, f'data_{idx}.pt'))
             idx += 1
             data_list.append(data)
         print(data_list)

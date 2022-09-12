@@ -33,6 +33,12 @@ import torch.optim as optim
 
 from torch.optim.lr_scheduler import MultiStepLR
 
+torch.backends.cudnn.deterministic = True
+torch.manual_seed(12345)
+torch.cuda.manual_seed_all(12345)
+random.seed(12345)
+np.random.seed(12345)
+
 from gnn.pinwheels_model import PershomLearnedFilt, PershomLearnedFiltSup, PershomRigidDegreeFilt, GIN, SimpleNNBaseline, ClassicGNN, ClassicReadoutFilt
 from data.data import dataset_factory, train_test_val_split, Subset
 from data.utils import my_collate
@@ -64,7 +70,6 @@ def cross_validation_with_val_set(args, dataset, model, folds, epochs, batch_siz
     val_losses, accs, durations = [], [], []
     for fold, (train_idx, test_idx,
                val_idx) in enumerate(zip(*k_fold(dataset, folds, args.device))):
-        # print("train_idx: ", train_idx)
         tr_dataset = Subset(dataset, train_idx)
         te_dataset = Subset(dataset, test_idx)
         val_dataset = Subset(dataset, val_idx)
@@ -268,7 +273,7 @@ if __name__ == "__main__":
     device= args.device
     dataset = dataset_factory(args.dataset_name, verbose=args.verbose)
 
-    if args.readout == "extph":
+    if args.readout == "extph" or args.readout== 'extph_cyclereps':
         model = PershomLearnedFiltSup(dataset, args.use_super_level_set_filtration, args.use_node_degree,
                                            args.set_node_degree_uninformative, args.use_node_label,
                                            args.use_raw_node_label,
