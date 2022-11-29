@@ -1,6 +1,12 @@
-# Graph Extended Filtration Learning
-
+# Graph Extended Filtration Learning (LoG 2022)
+Implementation for the paper GEFL: Extended Filtration Learning for Graph Classification (LoG 2022) by Simon Zhang, Soham Mukherjee and Tamal K. Dey.
 ## Summary
+
+
+<p align="center">
+<img width="750" src="assets/arch.jpg"/>
+</p>
+
 It is difficult for a standard message passing GNN with finite receptive field to keep track of arbitrary cycles of varied length for graph classification. We address this problem by using extended persistence with explicit cycle representatives in the readout function. Extended persistence is a quantifiable multiscale method to capture the relative prominence of cycles and connected components. We also improve the computation of extended perisistence by using a link-cut tree data structure to dynamically maintain cycle information and introduce parallelism. 
 
 ## Installation
@@ -56,3 +62,15 @@ cd external_experiments/sup_baseline
 source run_sup_baseline.sh
 ```
 
+## Citation
+
+```BibTex
+@inproceedings{
+zhang2022gefl,
+title={{GEFL}: Extended Filtration Learning for Graph Classification},
+author={Simon Zhang and Soham Mukherjee and Tamal K. Dey},
+booktitle={Learning on Graphs Conference},
+year={2022},
+url={https://openreview.net/forum?id=n5tvDCQGloq}
+}
+```
