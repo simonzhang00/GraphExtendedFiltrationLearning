@@ -1,5 +1,5 @@
 # Graph Extended Filtration Learning (LoG 2022)
-Implementation for the paper GEFL: Extended Filtration Learning for Graph Classification (LoG 2022) by Simon Zhang, Soham Mukherjee and Tamal K. Dey.
+Implementation for the paper GEFL: Extended Filtration Learning for Graph Classification (LoG 2022) by Simon Zhang, Soham Mukherjee and Tamal K. Dey, Purdue University.
 ## Summary
 
 
